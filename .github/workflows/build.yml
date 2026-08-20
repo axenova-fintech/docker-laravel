@@ -1,0 +1,70 @@
+name: Build Docker Images
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'php83/**'
+      - 'php85/**'
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      php83: ${{ steps.filter.outputs.php83 }}
+      php85: ${{ steps.filter.outputs.php85 }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            php83:
+              - 'php83/**'
+            php85:
+              - 'php85/**'
+
+  build-php:
+    needs: changes
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - version: "8.3"
+            directory: "php83"
+            image: "meadowkart/php83-laravel-swoole"
+
+          - version: "8.5"
+            directory: "php85"
+            image: "meadowkart/php85-laravel-swoole"
+
+    steps:
+      - name: Checkout
+        if: |
+          (matrix.directory == 'php83' && needs.changes.outputs.php83 == 'true') ||
+          (matrix.directory == 'php85' && needs.changes.outputs.php85 == 'true')
+        uses: actions/checkout@v4
+
+      - name: Login to DockerHub
+        if: |
+          (matrix.directory == 'php83' && needs.changes.outputs.php83 == 'true') ||
+          (matrix.directory == 'php85' && needs.changes.outputs.php85 == 'true')
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build & Push PHP ${{ matrix.version }} Laravel Image
+        if: |
+          (matrix.directory == 'php83' && needs.changes.outputs.php83 == 'true') ||
+          (matrix.directory == 'php85' && needs.changes.outputs.php85 == 'true')
+        uses: docker/build-push-action@v6
+        with:
+          context: ./${{ matrix.directory }}
+          push: true
+          tags: |
+            ${{ matrix.image }}:latest
+            ${{ matrix.image }}:sha-${{ github.sha }}
