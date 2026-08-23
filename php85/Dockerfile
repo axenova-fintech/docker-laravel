@@ -53,8 +53,15 @@ RUN docker-php-ext-install \
     sockets \
     zip
 
-# Install Redis
-RUN pecl install redis && docker-php-ext-enable redis
+# Install Redis (build from source — PECL stable release may lag behind PHP 8.5 support)
+RUN git clone --depth 1 https://github.com/phpredis/phpredis.git /tmp/phpredis \
+    && cd /tmp/phpredis \
+    && phpize \
+    && ./configure \
+    && make \
+    && make install \
+    && docker-php-ext-enable redis \
+    && rm -rf /tmp/phpredis
 
 # Install Swoole (for Octane)
 RUN pecl install swoole && docker-php-ext-enable swoole
